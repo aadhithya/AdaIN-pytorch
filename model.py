@@ -7,6 +7,11 @@ from typing import Optional, Callable
 
 
 class AdaIN:
+    """
+    Adaptive Instance Normalization as proposed in
+    'Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization' by Xun Huang, Serge Belongie.
+    """
+
     def _compute_mean_std(
         self, feats: torch.Tensor, eps=1e-8
     ) -> torch.Tensor:
@@ -25,7 +30,8 @@ class AdaIN:
         self, content_feats: torch.Tensor, style_feats: torch.Tensor
     ) -> torch.Tensor:
         """
-        __call__ Adaptive Instance Normalization
+        __call__ Adaptive Instance Normalization as proposaed in
+        'Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization' by Xun Huang, Serge Belongie.
 
         Args:
             content_feats (torch.Tensor): Content features
