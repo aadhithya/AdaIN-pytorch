@@ -130,7 +130,7 @@ class StyleNet(nn.Module):
 
         self.device = device
 
-        self.encoder = self.__create_or_load_model(VggEncoder, enc_path)
+        self.encoder = VggEncoder()
         self.decoder = self.__create_or_load_model(VggDecoder, dec_path)
 
         self.ada_in = AdaIN()
@@ -144,16 +144,25 @@ class StyleNet(nn.Module):
 
         return model.to(self.device)
 
+    def encoder_forward(self, x, return_last=False):
+        return self.encoder(x, return_last=return_last)
+
     def forward(
-        self, content_images: torch.Tensor, style_images: torch.Tensor
+        self,
+        content_images: torch.Tensor,
+        style_images: torch.Tensor,
+        alpha=1.0,
+        return_t=False,
     ):
         enc_input = torch.cat((content_images, style_images), 0)
 
         enc_features = self.encoder(enc_input, return_last=True)
         content_feats, style_feats = torch.chunk(enc_features, 2, dim=0)
 
-        norm_feats = self.ada_in(content_feats, style_feats)
+        t = self.ada_in(content_feats, style_feats)
 
-        out = self.decoder(norm_feats)
+        t = alpha * t + (1 - alpha) * content_feats
 
-        return out
+        out = self.decoder(t)
+
+        return out, t if return_t else out

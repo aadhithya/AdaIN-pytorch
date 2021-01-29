@@ -12,4 +12,4 @@ def train():
 
 @app.command("infer")
 def infer():
-    pass
+    raise NotImplementedError("Inference not implemented yet!")
