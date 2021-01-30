@@ -38,17 +38,19 @@ class VizDataset(Dataset):
         content_path: str,
         style_path: str,
         n_samples: int = 8,
-        train: bool = True,
     ) -> None:
         super().__init__()
-        store_attr()
+
+        self.content_path = content_path
+        self.style_path = style_path
+        self.n_samples = n_samples
 
         self.__load_paths()
 
         self.transform = tf.Compose(
             [
-                tf.Resize(256),
                 tf.ToTensor(),
+                tf.Resize((256, 256)),
                 tf.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),
@@ -56,25 +58,28 @@ class VizDataset(Dataset):
         )
 
     def __load_paths(self):
-        content_paths = glob(f"{self.content_path}/*.jpg")
-        style_paths = glob(f"{self.style_path}/*.jpg")
+        content_paths = np.array(glob(f"{self.content_path}/**/*.jpg"))
+        style_paths = np.array(glob(f"{self.style_path}/**/*.jpg"))
 
         max_samples = min(len(content_paths), len(style_paths))
 
         self.n_samples = min(max_samples, self.n_samples)
 
         # randomly select n-samples
-        select_idxs = np.random.permutation(max_samples)[self.n_samples]
+        self.select_idxs = np.random.permutation(max_samples)[
+            : self.n_samples
+        ]
 
-        self.image_paths = list(
-            zip(content_paths[select_idxs], style_paths[select_idxs])
-        )
+        self.content_paths = content_paths[self.select_idxs]
+        self.style_paths = style_paths[self.select_idxs]
 
     def __len__(self):
-        return len(self.image_paths)
+        return len(self.style_paths)
 
     def __getitem__(self, index):
-        c_path, s_path = self.image_paths[index]
+        c_path = self.content_paths[index]
+        s_path = self.style_paths[index]
+
         c_img = io.imread(c_path)
         s_img = io.imread(s_path)
 

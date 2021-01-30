@@ -1,6 +1,8 @@
 from typing import Optional
 from typer import Typer
 
+import os
+
 from train import Trainer
 from logger import log
 
@@ -42,6 +44,33 @@ def train(
 @app.command()
 def infer():
     raise NotImplementedError("Inference not implemented yet!")
+
+
+@app.command()
+def reset(o: bool = False):
+    def do_reset():
+        log.info("Deleting tensorboard logs and model checkpoints...")
+        if os.path.exists("./.temp/"):
+            os.remove("./.temp/*")
+        log.info("Resetting runid")
+        if os.path.exists("./.runid"):
+            os.remove(".runid")
+        log.info("Reset Complete!!")
+
+    if o:
+        do_reset()
+    else:
+        log.warn("!DANGER DANGER DANGER!")
+        res = (
+            input(
+                "Are you sure you want to reset past logs? [y|n] {default: n} >"
+            )
+            or "n"
+        )
+        if res == "y":
+            do_reset()
+        else:
+            log.info("Well, that was a close save! 😅")
 
 
 if __name__ == "__main__":

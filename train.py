@@ -145,14 +145,14 @@ class Trainer:
             torch.save(self.model.decoder.state_dict(), path)
         return
 
-    def vis_samples(self):
+    def viz_samples(self):
         ds = VizDataset(self.content_dir, self.style_dir)
         c_img, s_img = next(iter(DataLoader(ds, batch_size=8)))
         with torch.no_grad():
             c_img = c_img.float().to(self.device)
             s_img = s_img.float().to(self.device)
 
-            out = self.model(c_img, s_img)
+            out = self.model(c_img, s_img, return_t=False)
         grid = torch.cat((c_img, s_img, out), 0)
         grid = inv_normz(grid)
         grid = make_grid(grid, nrow=8)

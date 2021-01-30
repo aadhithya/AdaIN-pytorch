@@ -161,4 +161,7 @@ class StyleNet(nn.Module):
 
         out = self.decoder(t)
 
-        return out, t if return_t else out
+        if return_t:
+            return out, t
+        else:
+            return out
