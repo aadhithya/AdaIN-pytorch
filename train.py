@@ -1,7 +1,11 @@
 import torch
 from torch.optim import Adam
 import torch.nn.functional as F
+from torch.utils.data.sampler import RandomSampler
 from torchvision.utils import make_grid
+from torchvision.datasets import ImageFolder
+from torch.utils.data.dataloader import DataLoader
+import torchvision.transforms as tf
 
 import numpy as np
 import random
@@ -16,16 +20,20 @@ from typing import Optional, Dict
 from model import StyleNet
 from logger import log
 from utils import inv_normz
+from data import VizDataset, ResizeShortest
 
 
 class Trainer:
     def __init__(
         self,
-        epochs: int,
-        lr: float = 1e-3,
+        content_dir: str,
+        style_dir: str,
+        num_iters: int = 5e3,
+        imsize: int = 256,
+        lr: float = 1e-4,
         batch_size: int = 128,
         wt_s: float = 10.0,
-        ckpt_freq: int = 10,
+        ckpt_freq: int = 500,
         seed: int = 42,
         ckpt_path: Optional(str) = None,
         device: str = "auto",
@@ -34,6 +42,50 @@ class Trainer:
         self.__set_seed()
         self.__resolve_device()
         self.__init_writer()
+        self.inf = 1e100
+
+        if self.num_iters >= self.inf:
+            log.warn(
+                "num_iters has a max limit of 1e100! Setting num_iters to 1e100."
+            )
+        self.num_iters = min(self.num_iters, self.inf)
+
+        if self.imsize > 512:
+            log.warn("Imsize cannot be greater than 512! Setting imsize=512.")
+
+        train_transform = tf.Compose(
+            [
+                ResizeShortest(512),
+                tf.RandomCrop(self.imsize),
+                tf.ToTensor(),
+                tf.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
+        c_ds = ImageFolder(self.content_dir, transform=train_transform)
+        s_ds = ImageFolder(self.style_dir, transform=train_transform)
+
+        c_dl = DataLoader(
+            c_ds,
+            batch_size=self.batch_size,
+            sampler=RandomSampler(
+                c_ds, replacement=True, num_samples=self.inf
+            ),
+            num_workers=2,
+        )
+
+        s_dl = DataLoader(
+            s_ds,
+            batch_size=self.batch_size,
+            sampler=RandomSampler(
+                s_ds, replacement=True, num_samples=self.inf
+            ),
+            num_workers=2,
+        )
+
+        self.content_iter = iter(c_dl)
+        self.style_iter = iter(s_dl)
 
         self.model = StyleNet()
         self.optim = Adam(self.model.parameters(), lr=self.lr)
@@ -80,7 +132,7 @@ class Trainer:
         save_model_weights Saves the weights of the VggDecoder to disk.
         """
         path = (
-            f"{self.ckpt_dir}/cktp-style-net-{(self.current_ep + 1):03d}.tar"
+            f"{self.ckpt_dir}/cktp-style-net-{(self.train_step + 1):05d}.tar"
         )
         if isinstance(self.model, torch.nn.DataParallel):
             torch.save(self.model.module.decoder.state_dict(), path)
@@ -88,17 +140,18 @@ class Trainer:
             torch.save(self.model.decoder.state_dict(), path)
         return
 
-    def viz(self, content_img, style_img, stylized_img, n=8, train=True):
-        content_img = content_img[:n]
-        style_img = style_img[:n]
-        stylized_img = stylized_img[:n]
-        grid = make_grid(
-            torch.cat((content_img, style_img, stylized_img), 0), nrow=n
-        )
+    def vis_samples(self):
+        ds = VizDataset(self.content_dir, self.style_dir)
+        c_img, s_img = next(iter(DataLoader(ds, batch_size=8)))
+        with torch.no_grad():
+            c_img = c_img.float().to(self.device)
+            s_img = s_img.float().to(self.device)
 
-        tag = "train" if train else "val"
-
-        self.writer.add_image(tag, grid, self.current_ep)
+            out = self.model(c_img, s_img)
+        grid = torch.cat((c_img, s_img, out), 0)
+        grid = inv_normz(grid)
+        grid = make_grid(grid, nrow=8)
+        self.writer.add_image("viz", grid, self.train_step)
 
     def criterion(self, stylized_img, style_img, t):
         stylized_feats = self.model.encoder_forward(stylized_img)
@@ -112,10 +165,12 @@ class Trainer:
 
         return content_loss + self.wt_s * style_loss
 
-    def train_epoch(self):
-        self.metric = defaultdict(list)
-        loop = tqdm(self.train_loader, desc="Trg Itr: ", leave=False)
-        for content_img, style_img in loop:
+    def train(self):
+        self.train_step = 0
+        loop = trange(self.num_iters, desc="Trg Iter: ")
+        for ix in loop:
+            content_img = next(self.content_iter)
+            style_img = next(self.style_iter)
             content_img = content_img.float().to(self.device)
             style_img = style_img.float().to(self.device)
 
@@ -128,50 +183,12 @@ class Trainer:
             loss.backward()
 
             self.optim.step()
-            self.metric["loss"] += [loss.item()]
-            self.writer.add_scalar(
-                "step/train", loss.item(), global_step=self.train_step
-            )
-            self.train_step += 1
+            loop.set_postfix({"Loss": f"{loss.item():.4f}"})
+            self.writer.add_scalar("loss", loss.item(), ix)
 
-        self.viz(content_img, style_img, stylized_img)
-        return sum(self.metric["loss"]) / len(self.metric["loss"])
+            if ix % 100 == 0:
+                self.viz_samples()
 
-    def evaluate(self):
-        loop = tqdm(self.val_loader, desc="Val Itr: ", leave=False)
-        self.metric = defaultdict(list)
-        with torch.no_grad():
-            for content_img, style_img in loop:
-                content_img = content_img.float().to(self.device)
-                style_img = style_img.float().to(self.device)
-
-                stylized_img, t = self.model(
-                    content_img, style_img, return_t=True
-                )
-
-                loss = self.criterion(stylized_img, style_img, t)
-
-                self.metric["loss"] += [loss.item()]
-                self.writer.add_scalar(
-                    "step/val", loss.item(), global_step=self.train_step
-                )
-                self.val_step += 1
-
-        self.viz(content_img, style_img, stylized_img, train=False)
-        return sum(self.metric["loss"]) / len(self.metric["loss"])
-
-    def train(self):
-        self.train_step = 0
-        self.val_step = 0
-        self.current_ep = 0
-        loop = trange(self.epochs, desc="Epoch:")
-        for _ in loop:
-            loss = self.train_epoch()
-            loop.set_postfix({"TrgLoss": f"{loss:0.4f}"})
-            loss = self.evaluate()
-            loop.set_postfix({"ValLoss": f"{loss:0.4f}"})
-
-            if (self.current_ep + 1) % self.ckpt_freq == 0:
+            if (ix + 1) % self.ckpt_freq == 0:
                 self.save_model_weights()
-
-            self.current_ep += 1
+            self.train_step += 1
