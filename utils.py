@@ -1,4 +1,5 @@
 import torch
+from skimage.io import imread
 
 
 def inv_normz(img):
@@ -8,3 +9,8 @@ def inv_normz(img):
     )
     res = torch.clamp(img * std + mean, 0, 1)
     return res
+
+
+def img_loader(path: str):
+    img = imread(path)
+    return img

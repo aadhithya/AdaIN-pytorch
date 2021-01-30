@@ -132,3 +132,6 @@ dmypy.json
 .black
 .flake8
 .pre-commit-config.yaml
+.runid
+.temp/
+.vscode/

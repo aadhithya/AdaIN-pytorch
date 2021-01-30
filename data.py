@@ -4,8 +4,11 @@ import torchvision.transforms as tf
 from torch.utils.data.dataset import Dataset
 
 from skimage import transform, io
+from PIL import Image
 from fastcore.utils import store_attr
 from glob import glob
+
+from logger import log
 
 
 class ResizeShortest:
@@ -14,6 +17,7 @@ class ResizeShortest:
         self.size = 512
 
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
+        image = np.array(image)
         h, w = image.shape[:2]
 
         if h > w:

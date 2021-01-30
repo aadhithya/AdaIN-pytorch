@@ -19,7 +19,7 @@ from typing import Optional, Dict
 
 from model import StyleNet
 from logger import log
-from utils import inv_normz
+from utils import inv_normz, img_loader
 from data import VizDataset, ResizeShortest
 
 
@@ -42,7 +42,7 @@ class Trainer:
         self.__set_seed()
         self.__resolve_device()
         self.__init_writer()
-        self.inf = 1e100
+        self.inf = int(1e32)
 
         if self.num_iters >= self.inf:
             log.warn(
@@ -56,15 +56,23 @@ class Trainer:
         train_transform = tf.Compose(
             [
                 ResizeShortest(512),
-                tf.RandomCrop(self.imsize),
                 tf.ToTensor(),
+                tf.RandomCrop(self.imsize),
                 tf.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),
             ]
         )
-        c_ds = ImageFolder(self.content_dir, transform=train_transform)
-        s_ds = ImageFolder(self.style_dir, transform=train_transform)
+        c_ds = ImageFolder(
+            self.content_dir, transform=train_transform, loader=img_loader
+        )
+        s_ds = ImageFolder(
+            self.style_dir, transform=train_transform, loader=img_loader
+        )
+
+        import pdb
+
+        pdb.set_trace()
 
         c_dl = DataLoader(
             c_ds,
@@ -101,11 +109,12 @@ class Trainer:
         log.info(f"Using device: {self.device.upper()}.")
 
     def __set_seed(self):
-        torch.backends.cudnn.deterministic = True
         random.seed(self.seed)
         np.random.seed(self.seed)
         torch.manual_seed(self.seed)
-        torch.cuda.manual_seed_all(self.seed)
+        if torch.cuda.is_available():
+            torch.backends.cudnn.deterministic = True
+            torch.cuda.manual_seed_all(self.seed)
         log.info("Seed Set...🥜")
 
     def __generate_run_id(self):
@@ -169,8 +178,8 @@ class Trainer:
         self.train_step = 0
         loop = trange(self.num_iters, desc="Trg Iter: ")
         for ix in loop:
-            content_img = next(self.content_iter)
-            style_img = next(self.style_iter)
+            content_img = next(self.content_iter)[0]
+            style_img = next(self.style_iter)[0]
             content_img = content_img.float().to(self.device)
             style_img = style_img.float().to(self.device)
 
