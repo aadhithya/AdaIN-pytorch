@@ -18,7 +18,7 @@ def train(
     wt_s: float = 10.0,
     ckpt_freq: int = 500,
     seed: int = 42,
-    ckpt_path: Optional(str) = None,
+    ckpt_path: Optional[str] = None,
     device: str = "auto",
 ):
     log.info("Setting up training session...")
