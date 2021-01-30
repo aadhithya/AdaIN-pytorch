@@ -70,10 +70,6 @@ class Trainer:
             self.style_dir, transform=train_transform, loader=img_loader
         )
 
-        import pdb
-
-        pdb.set_trace()
-
         c_dl = DataLoader(
             c_ds,
             batch_size=self.batch_size,
@@ -95,7 +91,7 @@ class Trainer:
         self.content_iter = iter(c_dl)
         self.style_iter = iter(s_dl)
 
-        self.model = StyleNet()
+        self.model = StyleNet(self.ckpt_dir).to(self.device)
         self.optim = Adam(self.model.parameters(), lr=self.lr)
 
     def __resolve_device(self):

@@ -122,13 +122,9 @@ class VggDecoder(nn.Module):
 class StyleNet(nn.Module):
     def __init__(
         self,
-        enc_path: Optional[str] = None,
         dec_path: Optional[str] = None,
-        device: str = "cpu",
     ) -> None:
         super().__init__()
-
-        self.device = device
 
         self.encoder = VggEncoder()
         self.decoder = self.__create_or_load_model(VggDecoder, dec_path)
@@ -142,7 +138,7 @@ class StyleNet(nn.Module):
         if ckpt_path:
             model.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
 
-        return model.to(self.device)
+        return model
 
     def encoder_forward(self, x, return_last=False):
         return self.encoder(x, return_last=return_last)
