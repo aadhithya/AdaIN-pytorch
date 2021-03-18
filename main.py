@@ -14,10 +14,12 @@ def train(
     content_dir: str,
     style_dir: str,
     num_iters: int = 5e3,
+    n_epochs: int = 5,
     imsize: int = 256,
     lr: float = 1e-4,
     batch_size: int = 128,
     wt_s: float = 10.0,
+    num_samples: int = 1e2,
     ckpt_freq: int = 500,
     seed: int = 42,
     ckpt_path: Optional[str] = None,
@@ -28,16 +30,18 @@ def train(
         content_dir,
         style_dir,
         num_iters,
+        n_epochs,
         imsize,
         lr,
         batch_size,
         wt_s,
+        num_samples,
         ckpt_freq,
         seed,
         ckpt_path,
         device,
     )
-    log.info(f"Starting Training session with num_iters={trainer.num_iters}")
+    log.info(f"Starting Training session...🏋🏽‍♂️")
     trainer.train()
 
 
@@ -51,7 +55,7 @@ def reset(o: bool = False):
     def do_reset():
         log.info("Deleting tensorboard logs and model checkpoints...")
         if os.path.exists("./.temp/"):
-            os.remove("./.temp/*")
+            os.system("rm -rf .temp/*")
         log.info("Resetting runid")
         if os.path.exists("./.runid"):
             os.remove(".runid")
@@ -75,7 +79,7 @@ def reset(o: bool = False):
 
 if __name__ == "__main__":
     log.info(
-        "+++Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization+++"
+        "Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization"
     )
     log.info("arxiv: 1703.06868")
     log.info("www.github.com/aadhithya/AdaIN-pytorch")

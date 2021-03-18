@@ -19,7 +19,7 @@ from typing import Optional, Dict
 
 from model import StyleNet
 from logger import log
-from utils import inv_normz, img_loader
+from utils import inv_normz
 from data import VizDataset, ResizeShortest
 
 
@@ -29,10 +29,12 @@ class Trainer:
         content_dir: str,
         style_dir: str,
         num_iters: int = 5e3,
-        imsize: int = 256,
-        lr: float = 1e-4,
-        batch_size: int = 128,
+        n_epochs: int = 5,
+        imsize: int = 128,
+        lr: float = 1e-3,
+        batch_size: int = 16,
         wt_s: float = 10.0,
+        num_samples: int = 1e2,
         ckpt_freq: int = 500,
         seed: int = 42,
         ckpt_path: Optional[str] = None,
@@ -55,7 +57,7 @@ class Trainer:
 
         train_transform = tf.Compose(
             [
-                ResizeShortest(512),
+                ResizeShortest(self.imsize * 2),
                 tf.ToTensor(),
                 tf.RandomCrop(self.imsize),
                 tf.Normalize(
@@ -63,12 +65,8 @@ class Trainer:
                 ),
             ]
         )
-        c_ds = ImageFolder(
-            self.content_dir, transform=train_transform, loader=img_loader
-        )
-        s_ds = ImageFolder(
-            self.style_dir, transform=train_transform, loader=img_loader
-        )
+        c_ds = ImageFolder(self.content_dir, transform=train_transform)
+        s_ds = ImageFolder(self.style_dir, transform=train_transform)
 
         c_dl = DataLoader(
             c_ds,
@@ -76,7 +74,7 @@ class Trainer:
             sampler=RandomSampler(
                 c_ds, replacement=True, num_samples=self.inf
             ),
-            num_workers=2,
+            num_workers=3,
         )
 
         s_dl = DataLoader(
@@ -85,14 +83,26 @@ class Trainer:
             sampler=RandomSampler(
                 s_ds, replacement=True, num_samples=self.inf
             ),
-            num_workers=2,
+            num_workers=3,
         )
 
         self.content_iter = iter(c_dl)
         self.style_iter = iter(s_dl)
 
+        ds = VizDataset(
+            self.content_dir,
+            self.style_dir,
+            train_transform,
+            n_samples=self.num_samples,
+        )
+        self.train_loader = DataLoader(
+            ds, batch_size=self.batch_size, num_workers=4, drop_last=True
+        )
+
+        self.train_step = 0
+
         self.model = StyleNet(self.ckpt_path).to(self.device)
-        self.optim = Adam(self.model.parameters(), lr=self.lr)
+        self.optim = Adam(self.model.decoder.parameters(), lr=self.lr)
 
     def __resolve_device(self):
         self.device = self.device.lower()
@@ -170,14 +180,15 @@ class Trainer:
 
         return content_loss + self.wt_s * style_loss
 
-    def train(self):
-        self.train_step = 0
+    def train_as_steps(self):
         loop = trange(self.num_iters, desc="Trg Iter: ")
         for ix in loop:
             content_img = next(self.content_iter)[0]
             style_img = next(self.style_iter)[0]
             content_img = content_img.float().to(self.device)
             style_img = style_img.float().to(self.device)
+
+            self.optim.zero_grad()
 
             stylized_img, t = self.model(
                 content_img, style_img, return_t=True
@@ -197,3 +208,39 @@ class Trainer:
             if (ix + 1) % self.ckpt_freq == 0:
                 self.save_model_weights()
             self.train_step += 1
+
+    def train_epoch(self):
+        loop = tqdm(self.train_loader, desc="Trg Iter: ", leave=False)
+
+        for content_img, style_img in loop:
+            content_img = content_img.float().to(self.device)
+            style_img = style_img.float().to(self.device)
+
+            self.optim.zero_grad()
+
+            stylized_img, t = self.model(
+                content_img, style_img, return_t=True
+            )
+
+            loss = self.criterion(stylized_img, style_img, t)
+
+            loss.backward()
+
+            self.optim.step()
+            loop.set_postfix({"Loss": f"{loss.item():.4f}"})
+            self.writer.add_scalar("loss", loss.item(), self.train_step)
+
+            if self.train_step % 50 == 0:
+                self.viz_samples()
+
+            self.train_step += 1
+
+    def train(self):
+        self.current_ep = 0
+        for _ in trange(self.n_epochs, desc="Epoch"):
+            self.train_epoch()
+
+            if (self.current_ep + 1) % self.ckpt_freq == 0:
+                self.save_model_weights()
+
+            self.current_ep += 1

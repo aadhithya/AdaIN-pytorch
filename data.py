@@ -1,9 +1,11 @@
+from typing import Callable, Optional
 import numpy as np
 import torch
 import torchvision.transforms as tf
 from torch.utils.data.dataset import Dataset
+import albumentations.augmentations as A
 
-from skimage import transform, io
+# from skimage import transform, io
 from PIL import Image
 from fastcore.utils import store_attr
 from glob import glob
@@ -15,21 +17,24 @@ class ResizeShortest:
     def __init__(self, size=512) -> None:
         assert isinstance(size, (int, tuple))
         self.size = 512
+        self.resize_tf = A.LongestMaxSize(self.size)
 
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
-        image = np.array(image)
-        h, w = image.shape[:2]
+        # image = image
+        # h, w = image.shape[:2]
 
-        if h > w:
-            new_h, new_w = self.size * h / w, self.size
-        else:
-            new_h, new_w = self.size, self.size * w / h
+        # if h > w:
+        #     new_h, new_w = self.size * h / w, self.size
+        # else:
+        #     new_h, new_w = self.size, self.size * w / h
 
-        new_h, new_w = int(new_h), int(new_w)
+        # new_h, new_w = int(new_h), int(new_w)
 
-        img = transform.resize(image, (new_h, new_w))
+        # resize_tf = tf.Resize((new_h, new_w))
 
-        return img
+        img = self.resize_tf(image=image)
+
+        return img["image"]
 
 
 class VizDataset(Dataset):
@@ -37,6 +42,7 @@ class VizDataset(Dataset):
         self,
         content_path: str,
         style_path: str,
+        transform: Optional[Callable] = None,
         n_samples: int = 8,
     ) -> None:
         super().__init__()
@@ -46,16 +52,22 @@ class VizDataset(Dataset):
         self.n_samples = n_samples
 
         self.__load_paths()
+        if transform is None:
+            self.transform = tf.Compose(
+                [
+                    tf.ToTensor(),
+                    tf.Resize((128, 128)),
+                    tf.Normalize(
+                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    ),
+                ]
+            )
+        else:
+            self.transform = transform
 
-        self.transform = tf.Compose(
-            [
-                tf.ToTensor(),
-                tf.Resize((256, 256)),
-                tf.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),
-            ]
-        )
+    def shuffle_styles(self):
+        shfl_idxs = np.random.permutation(len(self.style_paths))
+        self.style_paths = self.style_paths[shfl_idxs]
 
     def __load_paths(self):
         content_paths = np.array(glob(f"{self.content_path}/**/*.jpg"))
@@ -80,8 +92,8 @@ class VizDataset(Dataset):
         c_path = self.content_paths[index]
         s_path = self.style_paths[index]
 
-        c_img = io.imread(c_path)
-        s_img = io.imread(s_path)
+        c_img = np.array(Image.open(c_path).convert("RGB"))
+        s_img = np.array(Image.open(s_path).convert("RGB"))
 
         c_img = self.transform(c_img)
         s_img = self.transform(s_img)
