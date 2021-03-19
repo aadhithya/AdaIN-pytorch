@@ -19,7 +19,7 @@ from typing import Optional, Dict
 
 from model import StyleNet
 from logger import log
-from utils import inv_normz
+from utils import inv_normz, compute_mean_std
 from data import VizDataset, ResizeShortest
 
 
@@ -169,14 +169,19 @@ class Trainer:
         self.writer.add_image("viz", grid, self.train_step)
 
     def criterion(self, stylized_img, style_img, t):
+        stylized_content_feats = self.model.encoder_forward(
+            stylized_img, True
+        )
         stylized_feats = self.model.encoder_forward(stylized_img)
         style_feats = self.model.encoder_forward(style_img)
 
-        content_loss = F.mse_loss(t, stylized_feats[-1])
+        content_loss = F.mse_loss(t, stylized_content_feats)
 
         style_loss = 0
         for stz, sty in zip(stylized_feats, style_feats):
-            style_loss += F.mse_loss(stz, sty)
+            stz_m, stz_s = compute_mean_std(stz)
+            sty_m, sty_s = compute_mean_std(sty)
+            style_loss += F.mse_loss(stz_m, sty_m) + F.mse_loss(stz_s, sty_s)
 
         return content_loss + self.wt_s * style_loss
 
@@ -237,10 +242,13 @@ class Trainer:
 
     def train(self):
         self.current_ep = 0
-        for _ in trange(self.n_epochs, desc="Epoch"):
-            self.train_epoch()
+        self.train_as_steps()
+        if 0:
+            for _ in trange(self.n_epochs, desc="Epoch"):
+                # self.train_epoch()
+                # self.train_as_steps()
 
-            if (self.current_ep + 1) % self.ckpt_freq == 0:
-                self.save_model_weights()
+                if (self.current_ep + 1) % self.ckpt_freq == 0:
+                    self.save_model_weights()
 
-            self.current_ep += 1
+                self.current_ep += 1
