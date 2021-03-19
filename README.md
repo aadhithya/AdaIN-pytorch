@@ -1,5 +1,8 @@
 # AdaIN-pytorch
-PyTorch implementation of "Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization" by Xun Huang, Serge Belongie. [arxiv](https://arxiv.org/abs/1703.06868)
+PyTorch implementation of "Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization" by Xun Huang, Serge Belongie. [arxiv](https://arxiv.org/abs/1703.06868).
+
+## 0. References
+- [irasin/Pytorch_AdaIN](https://github.com/irasin/Pytorch_AdaIN/)
 
 ## 1. Set up and train model
 ### 1.1 install requirements
