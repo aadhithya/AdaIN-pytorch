@@ -5,6 +5,8 @@ from torchvision import models
 
 from typing import Optional, Callable
 
+from utils import compute_mean_std
+
 
 class AdaIN:
     """
@@ -15,16 +17,7 @@ class AdaIN:
     def _compute_mean_std(
         self, feats: torch.Tensor, eps=1e-8
     ) -> torch.Tensor:
-        assert (
-            len(feats.shape) == 4
-        ), "feature map should be 4-dimensional of the form N,C,H,W!"
-        n, c, _, _ = feats.shape
-
-        feats = feats.view(n, c, -1)
-        mean = torch.mean(feats, dim=-1).view(n, c, 1, 1)
-        std = torch.std(feats, dim=-1).view(n, c, 1, 1) + eps
-
-        return mean, std
+        return compute_mean_std(feats, eps)
 
     def __call__(
         self, content_feats: torch.Tensor, style_feats: torch.Tensor
@@ -43,7 +36,7 @@ class AdaIN:
         c_mean, c_std = self._compute_mean_std(content_feats)
         s_mean, s_std = self._compute_mean_std(style_feats)
 
-        normalized = s_std * ((content_feats - c_mean) / c_std) + s_mean
+        normalized = (s_std * (content_feats - c_mean) / c_std) + s_mean
 
         return normalized
 
