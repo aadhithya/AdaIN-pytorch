@@ -16,6 +16,7 @@ from tensorboardX import SummaryWriter
 from fastcore.utils import store_attr
 from collections import defaultdict
 from typing import Optional, Dict
+from PIL import Image
 
 from model import StyleNet
 from logger import log
@@ -103,6 +104,8 @@ class Trainer:
 
         self.model = StyleNet(self.ckpt_path).to(self.device)
         self.optim = Adam(self.model.decoder.parameters(), lr=self.lr)
+
+        log.info(f"PIL.Image.MAX_IMAGE_PIXELS: {Image.MAX_IMAGE_PIXELS}")
 
     def __resolve_device(self):
         self.device = self.device.lower()
@@ -247,10 +250,10 @@ class Trainer:
 
     def train(self):
         self.current_ep = 0
-        self.train_as_steps()
-        if 0:
+        # self.train_as_steps()
+        if 1:
             for _ in trange(self.n_epochs, desc="Epoch", dynamic_ncols=True):
-                # self.train_epoch()
+                self.train_epoch()
                 # self.train_as_steps()
 
                 if (self.current_ep + 1) % self.ckpt_freq == 0:
