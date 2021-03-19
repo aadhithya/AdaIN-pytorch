@@ -186,7 +186,7 @@ class Trainer:
         return content_loss + self.wt_s * style_loss
 
     def train_as_steps(self):
-        loop = trange(self.num_iters, desc="Trg Iter: ")
+        loop = trange(self.num_iters, desc="Trg Iter: ", dynamic_ncols=True)
         for ix in loop:
             content_img = next(self.content_iter)[0]
             style_img = next(self.style_iter)[0]
@@ -215,7 +215,12 @@ class Trainer:
             self.train_step += 1
 
     def train_epoch(self):
-        loop = tqdm(self.train_loader, desc="Trg Iter: ", leave=False)
+        loop = tqdm(
+            self.train_loader,
+            desc="Trg Iter: ",
+            leave=False,
+            dynamic_ncols=True,
+        )
 
         for content_img, style_img in loop:
             content_img = content_img.float().to(self.device)
@@ -244,7 +249,7 @@ class Trainer:
         self.current_ep = 0
         self.train_as_steps()
         if 0:
-            for _ in trange(self.n_epochs, desc="Epoch"):
+            for _ in trange(self.n_epochs, desc="Epoch", dynamic_ncols=True):
                 # self.train_epoch()
                 # self.train_as_steps()
 
