@@ -17,7 +17,7 @@ class ResizeShortest:
     def __init__(self, size=512) -> None:
         assert isinstance(size, (int, tuple))
         self.size = 512
-        self.resize_tf = A.LongestMaxSize(self.size)
+        self.resize_tf = A.SmallestMaxSize(self.size)
 
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
         # image = image
@@ -32,7 +32,7 @@ class ResizeShortest:
 
         # resize_tf = tf.Resize((new_h, new_w))
 
-        img = self.resize_tf(image=image)
+        img = self.resize_tf(image=np.array(image))
 
         return img["image"]
 
