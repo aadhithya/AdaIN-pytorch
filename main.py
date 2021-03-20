@@ -1,10 +1,14 @@
 from typing import Optional
+from torch.cuda import device_count
 from typer import Typer
 
 import os
+from skimage import io
+from time import time
 
 from train import Trainer
 from logger import log
+from infer import run_infer
 
 app = Typer(name="AdaIN Style Transfer")
 
@@ -46,8 +50,37 @@ def train(
 
 
 @app.command()
-def infer():
-    raise NotImplementedError("Inference not implemented yet!")
+def infer(
+    content_img: str,
+    style_img: str,
+    ckpt_dir: str,
+    out_path: str = "./outs/output.jpg",
+    alpha: float = 1.0,
+    imsize: int = 256,
+    device="auto",
+):
+    """
+    infer Run Inference.
+
+    Args:
+        content_img (str): path to content image.
+        style_img (str): path to style image.
+        ckpt_dir (str): path to model checkpoint.
+        out_path (str): output image save path.
+        alpha (float, optional): Style strength [0,1]. Defaults to 1.0.
+        imsize (int, optional): Image size to run inference at. Image is resized to imsize before inference and the output is resized to input size using Bilinear interpolation. Defaults to 256.
+        device (str, optional): device to run inference on [auto, cpu, cuda]. Defaults to auto.
+    """
+    st = time()
+    out, _, _ = run_infer(
+        content_img, style_img, ckpt_dir, alpha, imsize, device
+    )
+    end = time()
+    log.info(f"Inference Successful! Inference Time: {(end/st)} sec.")
+    log.info("Saving Image...")
+    io.imsave(out_path, out)
+    log.info(f"Saving Successful: {out_path}")
+    log.info("Done Done London!")
 
 
 @app.command()
