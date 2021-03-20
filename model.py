@@ -136,23 +136,48 @@ class StyleNet(nn.Module):
     def encoder_forward(self, x, return_last=False):
         return self.encoder(x, return_last=return_last)
 
+    def generate(
+        self,
+        content_feats: torch.Tensor,
+        style_feats: torch.Tensor,
+        alpha=1.0,
+        return_t=False,
+    ):
+        """
+        generate Performs Adaptive Instance Normalization and generates output image.
+
+        Args:
+            content_feats (torch.Tensor): Content Feature tensor
+            style_feats (torch.Tensor): Style Feature tensor
+            alpha (float, optional): style strength. Defaults to 1.0.
+        """
+        t = self.ada_in(content_feats, style_feats)
+
+        t = alpha * t + (1 - alpha) * content_feats
+
+        out = self.decoder(t)
+
+        return (out, t) if return_t else out
+
     def forward(
         self,
         content_images: torch.Tensor,
         style_images: torch.Tensor,
         alpha=1.0,
         return_t=False,
+        infer=False,
     ):
         enc_input = torch.cat((content_images, style_images), 0)
 
         enc_features = self.encoder(enc_input, return_last=True)
         content_feats, style_feats = torch.chunk(enc_features, 2, dim=0)
 
-        t = self.ada_in(content_feats, style_feats)
+        out, t = self.generate(
+            content_feats, style_feats, alpha, return_t=True
+        )
 
-        t = alpha * t + (1 - alpha) * content_feats
-
-        out = self.decoder(t)
+        if infer:
+            return out, content_feats, style_feats
 
         if return_t:
             return out, t
