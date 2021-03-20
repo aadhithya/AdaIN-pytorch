@@ -41,7 +41,7 @@ class ResizeShortest:
 
 
 class ImageDataset(Dataset):
-    def __init__(self, img_dir: str, transforms=None) -> None:
+    def __init__(self, img_dir: str, transform=None) -> None:
         super().__init__()
         store_attr()
         self.__load_img_paths()
@@ -56,8 +56,8 @@ class ImageDataset(Dataset):
         try:
             img_path = self.img_paths[index]
             img = Image.open(img_path)
-            if self.transforms is not None:
-                img = self.transforms(img)
+            if self.transform is not None:
+                img = self.transform(img)
             return img, 0
         except Exception as e:
             log.warn(f"Skipping as exception raised in Dataloader: {e}")
