@@ -19,11 +19,17 @@ PyTorch implementation of "Arbitrary Style Transfer in Real-time with Adaptive I
 - to change training parameters and options:
   `python main.py train --help`
 
-## 2. Style Transfer using pre-trained model [TODO]
+## 2. Style Transfer using pre-trained model
 - to run inference:
     `python main.py infer [OPTIONS]`
 - info on supported options:
   `python main.py infer --help`
 
 ## 3. Some Results
-[TODO]
+- All images were resized to 1024x1024 for inference. The 1024x1024 outputs are interpolated to the original size using bilinear interpolation.
+
+| Content Img   |      Style Img      |  Output |
+|----------|:-------------:|------:|
+| <img src="./outs/contents/taj.jpg" width="384px"/> |  <img src="./outs/styles/starry.jpg" width="384px"/> | <img src="./outs/taj.jpg" width="384px"/> |
+| <img src="./outs/contents/tanjore.jpg" width="384px"/> |  <img src="./outs/styles/olives.jpg" width="384px"/> | <img src="./outs/output.jpg" width="384px"/> |
+| <img src="./outs/contents/arr.jpg" width="384px"/> |  <img src="./outs/styles/vg.jpg" width="384px"/> | <img src="./outs/arr1.jpg" width="384px"/> |
