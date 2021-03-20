@@ -3,7 +3,6 @@ from torch.optim import Adam
 import torch.nn.functional as F
 from torch.utils.data.sampler import RandomSampler
 from torchvision.utils import make_grid
-from torchvision.datasets import ImageFolder
 from torch.utils.data.dataloader import DataLoader
 import torchvision.transforms as tf
 
@@ -21,7 +20,7 @@ from PIL import Image
 from model import StyleNet
 from logger import log
 from utils import inv_normz, compute_mean_std
-from data import VizDataset, ResizeShortest
+from data import VizDataset, ResizeShortest, ImageDataset
 
 
 class Trainer:
@@ -66,8 +65,8 @@ class Trainer:
                 ),
             ]
         )
-        c_ds = ImageFolder(self.content_dir, transform=train_transform)
-        s_ds = ImageFolder(self.style_dir, transform=train_transform)
+        c_ds = ImageDataset(self.content_dir, transform=train_transform)
+        s_ds = ImageDataset(self.style_dir, transform=train_transform)
 
         c_dl = DataLoader(
             c_ds,
@@ -75,7 +74,7 @@ class Trainer:
             sampler=RandomSampler(
                 c_ds, replacement=True, num_samples=self.inf
             ),
-            num_workers=3,
+            num_workers=2,
         )
 
         s_dl = DataLoader(
@@ -84,21 +83,21 @@ class Trainer:
             sampler=RandomSampler(
                 s_ds, replacement=True, num_samples=self.inf
             ),
-            num_workers=3,
+            num_workers=2,
         )
 
         self.content_iter = iter(c_dl)
         self.style_iter = iter(s_dl)
 
-        ds = VizDataset(
+        self.ds = VizDataset(
             self.content_dir,
             self.style_dir,
             train_transform,
             n_samples=self.num_samples,
         )
-        self.train_loader = DataLoader(
-            ds, batch_size=self.batch_size, num_workers=4, drop_last=True
-        )
+        # self.train_loader = DataLoader(
+        #     ds, batch_size=self.batch_size, num_workers=1, drop_last=True
+        # )
 
         self.train_step = 0
 
@@ -159,8 +158,10 @@ class Trainer:
         return
 
     def viz_samples(self):
-        ds = VizDataset(self.content_dir, self.style_dir)
-        c_img, s_img = next(iter(DataLoader(ds, batch_size=8)))
+        # ds = VizDataset(self.content_dir, self.style_dir)
+        c_img, s_img = next(
+            iter(DataLoader(self.ds, batch_size=8, num_workers=1))
+        )
         with torch.no_grad():
             c_img = c_img.float().to(self.device)
             s_img = s_img.float().to(self.device)
@@ -250,8 +251,8 @@ class Trainer:
 
     def train(self):
         self.current_ep = 0
-        # self.train_as_steps()
-        if 1:
+        self.train_as_steps()
+        if 0:
             for _ in trange(self.n_epochs, desc="Epoch", dynamic_ncols=True):
                 self.train_epoch()
                 # self.train_as_steps()
