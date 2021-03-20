@@ -43,7 +43,9 @@ class ResizeShortest:
 class ImageDataset(Dataset):
     def __init__(self, img_dir: str, transform=None) -> None:
         super().__init__()
-        store_attr()
+        self.img_dir = img_dir
+        self.transform = transform
+
         self.__load_img_paths()
 
     def __load_img_paths(self):
@@ -55,7 +57,7 @@ class ImageDataset(Dataset):
     def __getitem__(self, index):
         try:
             img_path = self.img_paths[index]
-            img = Image.open(img_path)
+            img = Image.open(img_path).convert("RGB")
             if self.transform is not None:
                 img = self.transform(img)
             return img, 0
