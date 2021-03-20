@@ -40,6 +40,30 @@ class ResizeShortest:
         return img["image"]
 
 
+class ImageDataset(Dataset):
+    def __init__(self, img_dir: str, transforms=None) -> None:
+        super().__init__()
+        store_attr()
+        self.__load_img_paths()
+
+    def __load_img_paths(self):
+        self.img_paths = glob(f"{self.img_dir}/**/*.jpg")
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, index):
+        try:
+            img_path = self.img_paths[index]
+            img = Image.open(img_path)
+            if self.transforms is not None:
+                img = self.transforms(img)
+            return img, 0
+        except Exception as e:
+            log.warn(f"Skipping as exception raised in Dataloader: {e}")
+            return self.__getitem__(index + 1)
+
+
 class VizDataset(Dataset):
     def __init__(
         self,
