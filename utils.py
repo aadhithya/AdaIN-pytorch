@@ -1,5 +1,6 @@
 import torch
 from skimage.io import imread
+from logger import log
 
 
 def compute_mean_std(feats: torch.Tensor, eps=1e-8) -> torch.Tensor:
@@ -27,3 +28,16 @@ def inv_normz(img):
 def img_loader(path: str):
     img = imread(path)
     return img
+
+
+def resolve_device(device: str = "auto"):
+    if device.lower() in ["auto", "cpu", "cuda"]:
+        if device == "auto":
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            return device
+    else:
+        log.warn(
+            f"{device} should be one of [auto, cpu, cuda]! Defaulting to cpu."
+        )
+        return "cpu"
