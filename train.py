@@ -48,7 +48,7 @@ class Trainer:
 
         if self.num_iters >= self.inf:
             log.warn(
-                "num_iters has a max limit of 1e100! Setting num_iters to 1e100."
+                f"num_iters has a max limit of {self.inf}! Setting num_iters to {self.inf}."
             )
         self.num_iters = min(self.num_iters, self.inf)
 
@@ -211,7 +211,7 @@ class Trainer:
             loop.set_postfix({"Loss": f"{loss.item():.4f}"})
             self.writer.add_scalar("loss", loss.item(), ix)
 
-            if ix % 100 == 0:
+            if ix % 250 == 0:
                 self.viz_samples()
 
             if (ix + 1) % self.ckpt_freq == 0:
