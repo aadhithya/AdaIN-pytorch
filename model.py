@@ -15,12 +15,15 @@ class AdaIN:
     """
 
     def _compute_mean_std(
-        self, feats: torch.Tensor, eps=1e-8
+        self, feats: torch.Tensor, eps=1e-8, infer=False
     ) -> torch.Tensor:
-        return compute_mean_std(feats, eps)
+        return compute_mean_std(feats, eps, infer)
 
     def __call__(
-        self, content_feats: torch.Tensor, style_feats: torch.Tensor
+        self,
+        content_feats: torch.Tensor,
+        style_feats: torch.Tensor,
+        infer: bool = False,
     ) -> torch.Tensor:
         """
         __call__ Adaptive Instance Normalization as proposaed in
@@ -33,8 +36,8 @@ class AdaIN:
         Returns:
             torch.Tensor: [description]
         """
-        c_mean, c_std = self._compute_mean_std(content_feats)
-        s_mean, s_std = self._compute_mean_std(style_feats)
+        c_mean, c_std = self._compute_mean_std(content_feats, infer=infer)
+        s_mean, s_std = self._compute_mean_std(style_feats, infer=infer)
 
         normalized = (s_std * (content_feats - c_mean) / c_std) + s_mean
 
@@ -142,6 +145,7 @@ class StyleNet(nn.Module):
         style_feats: torch.Tensor,
         alpha=1.0,
         return_t=False,
+        infer=False,
     ):
         """
         generate Performs Adaptive Instance Normalization and generates output image.
@@ -151,7 +155,7 @@ class StyleNet(nn.Module):
             style_feats (torch.Tensor): Style Feature tensor
             alpha (float, optional): style strength. Defaults to 1.0.
         """
-        t = self.ada_in(content_feats, style_feats)
+        t = self.ada_in(content_feats, style_feats, infer)
 
         t = alpha * t + (1 - alpha) * content_feats
 
@@ -167,17 +171,20 @@ class StyleNet(nn.Module):
         return_t=False,
         infer=False,
     ):
-        enc_input = torch.cat((content_images, style_images), 0)
 
-        enc_features = self.encoder(enc_input, return_last=True)
-        content_feats, style_feats = torch.chunk(enc_features, 2, dim=0)
+        # enc_input = torch.cat((content_images, style_images), 0)
+        # enc_features = self.encoder(enc_input, return_last=True)
+        # content_feats, style_feats = torch.chunk(enc_features, 2, dim=0)
+
+        content_feats = self.encoder(content_images, return_last=True)
+        style_feats = self.encoder(style_images, return_last=True)
 
         out, t = self.generate(
-            content_feats, style_feats, alpha, return_t=True
+            content_feats, style_feats, alpha, return_t=True, infer=infer
         )
 
         if infer:
-            return out, content_feats, style_feats
+            return out  # content_feats, style_feats
 
         if return_t:
             return out, t
