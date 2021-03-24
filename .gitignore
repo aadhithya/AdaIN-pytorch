@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 outs/
+ckpt/
 *.py[cod]
 *$py.class
 
@@ -136,3 +137,5 @@ dmypy.json
 .runid
 .temp/
 .vscode/
+*.ipynb_checkpoints
+*.ipynb
