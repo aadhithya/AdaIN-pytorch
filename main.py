@@ -9,6 +9,7 @@ from time import time
 from train import Trainer
 from logger import log
 from infer import run_infer
+from export import export_to_onnx
 
 app = Typer(name="AdaIN Style Transfer")
 
@@ -72,15 +73,26 @@ def infer(
         device (str, optional): device to run inference on [auto, cpu, cuda]. Defaults to auto.
     """
     st = time()
-    out, _, _ = run_infer(
-        content_img, style_img, ckpt_dir, alpha, imsize, device
-    )
+    out = run_infer(content_img, style_img, ckpt_dir, alpha, imsize, device)
     end = time()
-    log.info(f"Inference Successful! Inference Time: {(end/st)} sec.")
+    log.info(f"Inference Successful! Inference Time: {(end-st)} sec.")
     log.info("Saving Image...")
     io.imsave(out_path, out)
     log.info(f"Saving Successful: {out_path}")
     log.info("Done Done London!")
+
+
+@app.command()
+def to_onnx(ckpt_path: str, save_path: str, imsize: int = 1024):
+    """
+    to_onnx Exports PyTorch Model to ONNX.
+
+    Args:
+        ckpt_path (str): Path to model checkpoint.
+        save_path (str): Path to save ONNX model to.
+        imsize (int, optional): Image size used for model inference. This cannot be changed during onnx inference!. Defaults to 1024.
+    """
+    export_to_onnx(ckpt_path, save_path, imsize)
 
 
 @app.command()
