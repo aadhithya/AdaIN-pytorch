@@ -58,11 +58,9 @@ def run_infer(
 
     log.info("Running Inference...")
     with torch.no_grad():
-        out, c_f, s_f = model.forward(
-            content_image, style_image, alpha, infer=True
-        )
+        out = model.forward(content_image, style_image, alpha, infer=True)
 
-    return postprocess(out, c_size), c_f, s_f
+    return postprocess(out, c_size)
 
 
 def postprocess(img, og_size=None):
