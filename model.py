@@ -190,3 +190,73 @@ class StyleNet(nn.Module):
             return out, t
         else:
             return out
+
+
+class ResBlock(nn.Module):
+    def __init__(self, n_channels: int, padding_mode: str = "reflect"):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(
+                n_channels, n_channels, 3, 1, 1, padding_mode=padding_mode
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                n_channels, n_channels, 3, 1, 1, padding_mode=padding_mode
+            ),
+        )
+
+    def forward(self, x: torch.Tensor):
+        res = x
+        return F.relu(self.block(x) + res)
+
+
+class Interpolate(nn.Module):
+    def __init__(self, scale_factor: int = 2):
+        super().__init__()
+        self.scale_factor = scale_factor
+
+    def forward(self, x: torch.Tensor):
+        return F.interpolate(
+            x, scale_factor=self.scale_factor, mode="nearest"
+        )
+
+
+class SRTransferNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        block1 = nn.Sequential(
+            nn.Conv2d(3, 32, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+            ResBlock(32),
+            Interpolate(),
+        )
+
+        block2 = nn.Sequential(
+            nn.Conv2d(32, 32, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+            ResBlock(32),
+        )
+
+        block3 = nn.Sequential(
+            nn.Conv2d(32, 64, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+            ResBlock(64),
+            Interpolate(),
+        )
+
+        block4 = nn.Sequential(
+            nn.Conv2d(64, 64, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+            ResBlock(64),
+        )
+
+        final = nn.Conv2d(64, 3, 3, 1, 1, padding_mode="reflect")
+
+        self.net = nn.ModuleList([block1, block2, block3, block4, final])
+
+    def forward(self, x: torch.Tensor):
+        for ix in range(len(self.net) - 1):
+            x = self.net[ix](x)
+
+        return
