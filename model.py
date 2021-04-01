@@ -260,3 +260,24 @@ class SRTransferNet(nn.Module):
             x = self.net[ix](x)
 
         return
+
+
+class SRNet(nn.Module):
+    def __init__(self, ckpt_path: Optional[str] = None):
+        super().__init__()
+
+        self.transfer_net = self.__create_or_load_model(
+            SRTransferNet, ckpt_path
+        )
+
+    def __create_or_load_model(
+        self, Model: nn.Module, ckpt_path: Optional[str]
+    ) -> nn.Module:
+        model = Model()
+        if ckpt_path:
+            model.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
+
+        return model
+
+    def forward(self, x: torch.Tensor):
+        return self.transfer_net(x)

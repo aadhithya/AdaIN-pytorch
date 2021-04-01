@@ -17,7 +17,7 @@ from collections import defaultdict
 from typing import Optional, Dict
 from PIL import Image
 
-from model import StyleNet
+from model import StyleNet, SRNet
 from logger import log
 from utils import inv_normz, compute_mean_std
 from data import VizDataset, ResizeShortest, ImageDataset
@@ -261,3 +261,94 @@ class Trainer:
                     self.save_model_weights()
 
                 self.current_ep += 1
+
+
+class SRTrainer(Trainer):
+    def __init__(
+        self,
+        content_dir: str,
+        style_dir: str,
+        stylenet_path: str,
+        num_iters: int,
+        n_epochs: int,
+        imsize: int,
+        lr: float,
+        batch_size: int,
+        wt_s: float,
+        num_samples: int,
+        ckpt_freq: int,
+        seed: int,
+        ckpt_path: Optional[str],
+        device: str,
+    ) -> None:
+        super().__init__(
+            content_dir,
+            style_dir,
+            num_iters=num_iters,
+            n_epochs=n_epochs,
+            imsize=imsize,
+            lr=lr,
+            batch_size=batch_size,
+            wt_s=wt_s,
+            num_samples=num_samples,
+            ckpt_freq=ckpt_freq,
+            seed=seed,
+            ckpt_path=ckpt_path,
+            device=device,
+        )
+
+        self.style_net = StyleNet(stylenet_path).eval()
+        self.model = SRNet(ckpt_path)
+
+        self.resize = tf.Resize(64)
+
+        self.optim = Adam(self.model.parameters(), lr=lr)
+
+    def save_model_weights(self):
+        """
+        save_model_weights Saves the weights of the VggDecoder to disk.
+        """
+        path = f"{self.ckpt_dir}/ckpt-sr-net-{(self.train_step + 1):05d}.tar"
+        if isinstance(self.model, torch.nn.DataParallel):
+            torch.save(self.model.module.transfer_net.state_dict(), path)
+        else:
+            torch.save(self.model.transfer_net.state_dict(), path)
+        return
+
+    def train_as_steps(self):
+        loop = trange(self.num_iters, desc="Trg Iter: ", dynamic_ncols=True)
+        for ix in loop:
+            content_img = next(self.content_iter)[0]
+            style_img = next(self.style_iter)[0]
+            content_img = content_img.float().to(self.device)
+            style_img = style_img.float().to(self.device)
+
+            content_img_lr = self.resize(content_img)
+
+            self.optim.zero_grad()
+
+            with torch.no_grad():
+                stylized = self.model(content_img, style_img, return_t=False)
+
+                stylized_lr = self.model(
+                    content_img_lr, style_img, return_t=False
+                )
+
+            stylized_sr = self.model(stylized_lr)
+
+            loss = self.criterion(
+                stylized_sr, stylized, content_img, style_img
+            )
+
+            loss.backward()
+
+            self.optim.step()
+            loop.set_postfix({"Loss": f"{loss.item():.4f}"})
+            self.writer.add_scalar("loss", loss.item(), ix)
+
+            if ix % 250 == 0:
+                self.viz_samples()
+
+            if (ix + 1) % self.ckpt_freq == 0:
+                self.save_model_weights()
+            self.train_step += 1
