@@ -256,10 +256,10 @@ class SRTransferNet(nn.Module):
         self.net = nn.ModuleList([block1, block2, block3, block4, final])
 
     def forward(self, x: torch.Tensor):
-        for ix in range(len(self.net) - 1):
+        for ix in range(len(self.net)):
             x = self.net[ix](x)
 
-        return
+        return x
 
 
 class SRNet(nn.Module):

@@ -6,7 +6,7 @@ import os
 from skimage import io
 from time import time
 
-from train import Trainer
+from train import Trainer, SRTrainer
 from logger import log
 from infer import run_infer
 from export import export_to_onnx
@@ -46,7 +46,45 @@ def train(
         ckpt_path,
         device,
     )
-    log.info(f"Starting Training session...🏋🏽‍♂️")
+    log.info("Starting Training session...🏋🏽‍♂️")
+    trainer.train()
+
+
+@app.command()
+def train_sr(
+    content_dir: str,
+    style_dir: str,
+    stylenet_path: str,
+    num_iters: int = 5e3,
+    n_epochs: int = 5,
+    imsize: int = 256,
+    lr: float = 1e-4,
+    batch_size: int = 128,
+    wt_s: float = 10.0,
+    num_samples: int = 1e2,
+    ckpt_freq: int = 500,
+    seed: int = 42,
+    ckpt_path: Optional[str] = None,
+    device: str = "auto",
+):
+    log.info("Setting up training session...")
+    trainer = SRTrainer(
+        content_dir,
+        style_dir,
+        stylenet_path,
+        num_iters,
+        n_epochs,
+        imsize,
+        lr,
+        batch_size,
+        wt_s,
+        num_samples,
+        ckpt_freq,
+        seed,
+        ckpt_path,
+        device,
+    )
+    log.info("Starting SR Training session...🏋🏽‍♂️")
     trainer.train()
 
 

@@ -297,8 +297,8 @@ class SRTrainer(Trainer):
             device=device,
         )
 
-        self.style_net = StyleNet(stylenet_path).eval()
-        self.model = SRNet(ckpt_path)
+        self.style_net = StyleNet(stylenet_path).to(self.device).eval()
+        self.model = SRNet(ckpt_path).to(self.device)
 
         self.resize = tf.Resize(64)
 
@@ -316,6 +316,7 @@ class SRTrainer(Trainer):
         return
 
     def train_as_steps(self):
+        self.model.train()
         loop = trange(self.num_iters, desc="Trg Iter: ", dynamic_ncols=True)
         for ix in loop:
             content_img = next(self.content_iter)[0]
@@ -329,9 +330,11 @@ class SRTrainer(Trainer):
             self.optim.zero_grad()
 
             with torch.no_grad():
-                stylized = self.model(content_img, style_img, return_t=False)
+                stylized = self.style_net(
+                    content_img, style_img, return_t=False
+                )
 
-                stylized_lr = self.model(
+                stylized_lr = self.style_net(
                     content_img_lr, style_img_lr, return_t=False
                 )
 
@@ -355,38 +358,40 @@ class SRTrainer(Trainer):
             self.train_step += 1
 
     def criterion(
-        self, stylized_sr: torch.Tensor, stylized: torch.Tensor, **kwargs
+        self,
+        stylized_sr: torch.Tensor,
+        stylized: torch.Tensor,
+        content_img: torch.Tensor,
+        style_img: torch.Tensor,
     ):
         sty_sr_content_feats = self.style_net.encoder_forward(
             stylized_sr, True
         )
         sty_content_feats = self.style_net.encoder_forward(stylized, True)
-        content_feats = self.style_net.encoder_forward(
-            kwargs["content_img"], True
-        )
+        content_feats = self.style_net.encoder_forward(content_img, True)
 
         sr_loss = F.smooth_l1_loss(
-            sty_sr_content_feats, sty_content_feats, reduction="sum"
-        ) / len(stylized)
+            sty_sr_content_feats, sty_content_feats, reduction="mean"
+        )
 
         content_loss = F.smooth_l1_loss(
-            sty_sr_content_feats, content_feats, reduction="sum"
-        ) / len(stylized)
+            sty_sr_content_feats, content_feats, reduction="mean"
+        )
 
         sty_sr_feats = self.style_net.encoder_forward(stylized_sr)
-        sty_feats = self.style_net.encoder_forward(kwargs["style_img"])
+        sty_feats = self.style_net.encoder_forward(style_img)
 
         style_loss = 0
         for stz, sty in zip(sty_sr_feats, sty_feats):
             stz_m, stz_s = compute_mean_std(stz)
             sty_m, sty_s = compute_mean_std(sty)
             style_loss += F.mse_loss(
-                stz_m, sty_m, reduction="sum"
-            ) + F.mse_loss(stz_s, sty_s, reduction="sum")
+                stz_m, sty_m, reduction="mean"
+            ) + F.mse_loss(stz_s, sty_s, reduction="mean")
 
-        style_loss /= len(stylized)
+        # style_loss /= len(stylized)
 
-        return sr_loss + style_loss + content_loss
+        return (5 * sr_loss) + style_loss + content_loss
 
     def viz_samples(self):
         # ds = VizDataset(self.content_dir, self.style_dir)
