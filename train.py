@@ -261,3 +261,37 @@ class Trainer:
                     self.save_model_weights()
 
                 self.current_ep += 1
+
+
+class TrainerDS(Trainer):
+    def __init__(
+        self,
+        content_dir: str,
+        style_dir: str,
+        num_iters: int,
+        n_epochs: int,
+        imsize: int,
+        lr: float,
+        batch_size: int,
+        wt_s: float,
+        num_samples: int,
+        ckpt_freq: int,
+        seed: int,
+        ckpt_path: Optional[str],
+        device: str,
+    ) -> None:
+        super().__init__(
+            content_dir,
+            style_dir,
+            num_iters=num_iters,
+            n_epochs=n_epochs,
+            imsize=imsize,
+            lr=lr,
+            batch_size=batch_size,
+            wt_s=wt_s,
+            num_samples=num_samples,
+            ckpt_freq=ckpt_freq,
+            seed=seed,
+            ckpt_path=ckpt_path,
+            device=device,
+        )
