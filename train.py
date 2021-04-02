@@ -324,6 +324,7 @@ class SRTrainer(Trainer):
             style_img = style_img.float().to(self.device)
 
             content_img_lr = self.resize(content_img)
+            style_img_lr = self.resize(style_img)
 
             self.optim.zero_grad()
 
@@ -331,7 +332,7 @@ class SRTrainer(Trainer):
                 stylized = self.model(content_img, style_img, return_t=False)
 
                 stylized_lr = self.model(
-                    content_img_lr, style_img, return_t=False
+                    content_img_lr, style_img_lr, return_t=False
                 )
 
             stylized_sr = self.model(stylized_lr)
@@ -352,3 +353,57 @@ class SRTrainer(Trainer):
             if (ix + 1) % self.ckpt_freq == 0:
                 self.save_model_weights()
             self.train_step += 1
+
+    def criterion(
+        self, stylized_sr: torch.Tensor, stylized: torch.Tensor, **kwargs
+    ):
+        sty_sr_content_feats = self.style_net.encoder_forward(
+            stylized_sr, True
+        )
+        sty_content_feats = self.style_net.encoder_forward(stylized, True)
+        content_feats = self.style_net.encoder_forward(
+            kwargs["content_img"], True
+        )
+
+        sr_loss = F.smooth_l1_loss(
+            sty_sr_content_feats, sty_content_feats, reduction="sum"
+        ) / len(stylized)
+
+        content_loss = F.smooth_l1_loss(
+            sty_sr_content_feats, content_feats, reduction="sum"
+        ) / len(stylized)
+
+        sty_sr_feats = self.style_net.encoder_forward(stylized_sr)
+        sty_feats = self.style_net.encoder_forward(kwargs["style_img"])
+
+        style_loss = 0
+        for stz, sty in zip(sty_sr_feats, sty_feats):
+            stz_m, stz_s = compute_mean_std(stz)
+            sty_m, sty_s = compute_mean_std(sty)
+            style_loss += F.mse_loss(
+                stz_m, sty_m, reduction="sum"
+            ) + F.mse_loss(stz_s, sty_s, reduction="sum")
+
+        style_loss /= len(stylized)
+
+        return sr_loss + style_loss + content_loss
+
+    def viz_samples(self):
+        # ds = VizDataset(self.content_dir, self.style_dir)
+        c_img, s_img = next(
+            iter(DataLoader(self.ds, batch_size=8, num_workers=1))
+        )
+        with torch.no_grad():
+            c_img = c_img.float().to(self.device)
+            s_img = s_img.float().to(self.device)
+            c_lr = self.resize(c_img)
+            s_lr = self.resize(s_img)
+
+            out = self.style_net(c_img, s_img, return_t=False)
+            out_lr = self.style_net(c_lr, s_lr, return_t=False)
+            out_sr = self.model(out_lr)
+
+        grid = torch.cat((c_img, s_img, out, out_sr), 0)
+        grid = inv_normz(grid)
+        grid = make_grid(grid, nrow=8)
+        self.writer.add_image("viz", grid, self.train_step)
