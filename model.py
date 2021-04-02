@@ -76,11 +76,11 @@ class VggDecoder(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        block1 = nn.Sequential(
+        self.block1 = nn.Sequential(
             nn.Conv2d(512, 256, 3, 1, 1, padding_mode="reflect"), nn.ReLU()
         )
 
-        block2 = nn.Sequential(
+        self.block2 = nn.Sequential(
             nn.Conv2d(256, 256, 3, 1, 1, padding_mode="reflect"),
             nn.ReLU(),
             nn.Conv2d(256, 256, 3, 1, 1, padding_mode="reflect"),
@@ -91,20 +91,22 @@ class VggDecoder(nn.Module):
             nn.ReLU(),
         )
 
-        block3 = nn.Sequential(
+        self.block3 = nn.Sequential(
             nn.Conv2d(128, 128, 3, 1, 1, padding_mode="reflect"),
             nn.ReLU(),
             nn.Conv2d(128, 64, 3, 1, 1, padding_mode="reflect"),
             nn.ReLU(),
         )
 
-        block4 = nn.Sequential(
+        self.block4 = nn.Sequential(
             nn.Conv2d(64, 64, 3, 1, 1, padding_mode="reflect"),
             nn.ReLU(),
             nn.Conv2d(64, 3, 3, 1, 1, padding_mode="reflect"),
         )
 
-        self.net = nn.ModuleList([block1, block2, block3, block4])
+        self.net = nn.ModuleList(
+            [self.block1, self.block2, self.block3, self.block4]
+        )
 
     def forward(self, x):
         for ix, module in enumerate(self.net):
@@ -113,6 +115,41 @@ class VggDecoder(nn.Module):
             if ix < len(self.net) - 1:
                 x = F.interpolate(x, scale_factor=2, mode="nearest")
         return x
+
+
+class DecoderSR(VggDecoder):
+    def __init__(self) -> None:
+        super().__init__()
+        self.block4 = nn.Sequential(
+            nn.Conv2d(64, 64, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+        )
+
+        self.block5 = nn.Sequential(
+            nn.Conv2d(64, 32, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+        )
+
+        self.block6 = nn.Sequential(
+            nn.Conv2d(32, 32, 3, 1, 1, padding_mode="reflect"),
+            nn.ReLU(),
+            nn.Conv2d(32, 3, 3, 1, 1, padding_mode="reflect"),
+        )
+
+        self.net = nn.ModuleList(
+            [
+                self.block1,
+                self.block2,
+                self.block3,
+                self.block4,
+                self.block5,
+                self.block6,
+            ]
+        )
 
 
 class StyleNet(nn.Module):
@@ -190,3 +227,9 @@ class StyleNet(nn.Module):
             return out, t
         else:
             return out
+
+
+class StyleNetDS(StyleNet):
+    def __init__(self, dec_path: Optional[str]) -> None:
+        super().__init__(dec_path=dec_path)
+        self.decoder = self.__create_or_load_model(DecoderSR, dec_path)
