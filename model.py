@@ -160,11 +160,11 @@ class StyleNet(nn.Module):
         super().__init__()
 
         self.encoder = VggEncoder()
-        self.decoder = self.__create_or_load_model(VggDecoder, dec_path)
+        self.decoder = self.create_or_load_model(VggDecoder, dec_path)
 
         self.ada_in = AdaIN()
 
-    def __create_or_load_model(
+    def create_or_load_model(
         self, Model: nn.Module, ckpt_path: Optional[str]
     ) -> nn.Module:
         model = Model()
@@ -232,4 +232,4 @@ class StyleNet(nn.Module):
 class StyleNetDS(StyleNet):
     def __init__(self, dec_path: Optional[str]) -> None:
         super().__init__(dec_path=dec_path)
-        self.decoder = self.__create_or_load_model(DecoderSR, dec_path)
+        self.decoder = self.create_or_load_model(DecoderSR, dec_path)
