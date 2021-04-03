@@ -6,7 +6,7 @@ import os
 from skimage import io
 from time import time
 
-from train import Trainer
+from train import Trainer, TrainerDS
 from logger import log
 from infer import run_infer
 from export import export_to_onnx
@@ -29,9 +29,11 @@ def train(
     seed: int = 42,
     ckpt_path: Optional[str] = None,
     device: str = "auto",
+    ds: bool = False,
 ):
     log.info("Setting up training session...")
-    trainer = Trainer(
+    TrainSession = TrainerDS if ds else Trainer
+    trainer = TrainSession(
         content_dir,
         style_dir,
         num_iters,
