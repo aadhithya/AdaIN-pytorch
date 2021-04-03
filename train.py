@@ -303,8 +303,9 @@ class TrainerDS(Trainer):
             device=device,
         )
 
-        self.model = StyleNetDS(ckpt_path)
+        self.model = StyleNetDS(ckpt_path).to(self.device)
         self.resize = tf.Resize(imsize)
+        self.optim = Adam(self.model.decoder.parameters(), lr=lr)
 
     def criterion(self, stylized_img, style_img, t):
         stylized_img = self.resize(stylized_img)
