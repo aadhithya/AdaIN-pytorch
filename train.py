@@ -17,7 +17,7 @@ from collections import defaultdict
 from typing import Optional, Dict
 from PIL import Image
 
-from model import StyleNet
+from model import StyleNet, StyleNetDS
 from logger import log
 from utils import inv_normz, compute_mean_std
 from data import VizDataset, ResizeShortest, ImageDataset
@@ -157,16 +157,23 @@ class Trainer:
             torch.save(self.model.decoder.state_dict(), path)
         return
 
-    def viz_samples(self):
+    def viz_samples(self, **kwargs):
         # ds = VizDataset(self.content_dir, self.style_dir)
-        c_img, s_img = next(
-            iter(DataLoader(self.ds, batch_size=8, num_workers=1))
-        )
+        if "c_img" in kwargs and "s_img" in kwargs:
+            c_img = kwargs["c_img"]
+            s_img = kwargs["s_img"]
+        else:
+            c_img, s_img = next(
+                iter(DataLoader(self.ds, batch_size=8, num_workers=1))
+            )
+        resize = kwargs["resize"] if "resize" in kwargs else False
+
         with torch.no_grad():
             c_img = c_img.float().to(self.device)
             s_img = s_img.float().to(self.device)
-
             out = self.model(c_img, s_img, return_t=False)
+            if resize:
+                out = self.resize(out)
         grid = torch.cat((c_img, s_img, out), 0)
         grid = inv_normz(grid)
         grid = make_grid(grid, nrow=8)
@@ -295,3 +302,25 @@ class TrainerDS(Trainer):
             ckpt_path=ckpt_path,
             device=device,
         )
+
+        self.model = StyleNetDS(ckpt_path)
+        self.resize = tf.Resize(imsize)
+
+    def criterion(self, stylized_img, style_img, t):
+        stylized_img = self.resize(stylized_img)
+        return super().criterion(stylized_img, style_img, t)
+
+    def viz_samples(self):
+        c_img, s_img = next(
+            iter(DataLoader(self.ds, batch_size=8, num_workers=1))
+        )
+        with torch.no_grad():
+            c_img = c_img.float().to(self.device)
+            s_img = s_img.float().to(self.device)
+            out = self.model(c_img, s_img, return_t=False)
+
+        grid = inv_normz(out)
+        grid = make_grid(grid, nrow=8)
+        self.writer.add_image("viz-4x", grid, self.train_step)
+
+        return super().viz_samples(c_img=c_img, s_img=s_img, resize=True)
