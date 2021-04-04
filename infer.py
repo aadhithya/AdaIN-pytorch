@@ -9,7 +9,7 @@ from torchvision.transforms.transforms import Resize
 from utils import resolve_device, inv_normz
 from logger import log
 
-from model import StyleNet
+from model import StyleNet, StyleNetDS
 
 
 def load_image(img_path, imsize):
@@ -54,7 +54,7 @@ def run_infer(
     style_image = style_image.float().to(device)
 
     log.info(f"Loading Model: {ckpt_dir}")
-    model = StyleNet(ckpt_dir).to(device).eval()
+    model = StyleNetDS(ckpt_dir).to(device).eval()
 
     log.info("Running Inference...")
     with torch.no_grad():

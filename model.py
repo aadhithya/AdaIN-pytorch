@@ -231,5 +231,5 @@ class StyleNet(nn.Module):
 
 class StyleNetDS(StyleNet):
     def __init__(self, dec_path: Optional[str]) -> None:
-        super().__init__(dec_path=dec_path)
+        super().__init__(None)
         self.decoder = self.create_or_load_model(DecoderSR, dec_path)
