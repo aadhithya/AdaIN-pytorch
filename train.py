@@ -34,6 +34,7 @@ class Trainer:
         lr: float = 1e-3,
         batch_size: int = 16,
         wt_s: float = 10.0,
+        wt_c: float = 1.0,
         num_samples: int = 1e2,
         ckpt_freq: int = 500,
         seed: int = 42,
@@ -194,7 +195,7 @@ class Trainer:
             sty_m, sty_s = compute_mean_std(sty)
             style_loss += F.mse_loss(stz_m, sty_m) + F.mse_loss(stz_s, sty_s)
 
-        return content_loss + self.wt_s * style_loss
+        return self.wt_c * content_loss + self.wt_s * style_loss
 
     def train_as_steps(self):
         loop = trange(self.num_iters, desc="Trg Iter: ", dynamic_ncols=True)
@@ -281,6 +282,7 @@ class TrainerDS(Trainer):
         lr: float,
         batch_size: int,
         wt_s: float,
+        wt_c: float,
         num_samples: int,
         ckpt_freq: int,
         seed: int,

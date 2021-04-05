@@ -24,6 +24,7 @@ def train(
     lr: float = 1e-4,
     batch_size: int = 128,
     wt_s: float = 10.0,
+    wt_c: float = 1.0,
     num_samples: int = 1e2,
     ckpt_freq: int = 500,
     seed: int = 42,
@@ -42,13 +43,14 @@ def train(
         lr,
         batch_size,
         wt_s,
+        wt_c,
         num_samples,
         ckpt_freq,
         seed,
         ckpt_path,
         device,
     )
-    log.info(f"Starting Training session...🏋🏽‍♂️")
+    log.info("Starting Training session...🏋🏽‍♂️")
     trainer.train()
 
 
