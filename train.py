@@ -17,7 +17,7 @@ from collections import defaultdict
 from typing import Optional, Dict
 from PIL import Image
 
-from model import StyleNet
+from model import StyleNet, MobileStyleNet, VggEncoder
 from logger import log
 from utils import inv_normz, compute_mean_std
 from data import VizDataset, ResizeShortest, ImageDataset
@@ -37,6 +37,7 @@ class Trainer:
         num_samples: int = 1e2,
         ckpt_freq: int = 500,
         seed: int = 42,
+        backend: Optional[str] = "vgg",
         ckpt_path: Optional[str] = None,
         device: str = "auto",
     ) -> None:
@@ -100,10 +101,16 @@ class Trainer:
         # )
 
         self.train_step = 0
+        self.vgg = VggEncoder().eval()
 
-        self.model = StyleNet(self.ckpt_path).to(self.device)
+        if backend == "vgg":
+            self.model = StyleNet(self.ckpt_path).to(self.device)
+        else:
+            self.model = MobileStyleNet(self.ckpt_path).to(self.device)
+
         self.optim = Adam(self.model.decoder.parameters(), lr=self.lr)
 
+        log.info(f"BACKEND: {backend.upper()}")
         log.info(f"PIL.Image.MAX_IMAGE_PIXELS: {Image.MAX_IMAGE_PIXELS}")
 
     def __resolve_device(self):
@@ -173,11 +180,9 @@ class Trainer:
         self.writer.add_image("viz", grid, self.train_step)
 
     def criterion(self, stylized_img, style_img, t):
-        stylized_content_feats = self.model.encoder_forward(
-            stylized_img, True
-        )
-        stylized_feats = self.model.encoder_forward(stylized_img)
-        style_feats = self.model.encoder_forward(style_img)
+        stylized_content_feats = self.vgg(stylized_img, True)
+        stylized_feats = self.vgg(stylized_img)
+        style_feats = self.vgg(style_img)
 
         content_loss = F.mse_loss(t, stylized_content_feats)
 

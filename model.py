@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.modules.upsampling import Upsample
 from torchvision import models
 
 from typing import Optional, Callable
@@ -70,6 +71,223 @@ class VggEncoder(nn.Module):
         f4 = self.block4(f3)
 
         return f4 if return_last else (f1, f2, f3, f4)
+
+
+class MobileNetBackend(nn.Module):
+    def __init__(self, n: int = 14):
+        super().__init__()
+        self.net = models.mobilenet_v2(True).features[: n + 1]
+        self.__set_grad(False)
+
+    def __set_grad(self, requires_grad: bool):
+        for p in self.parameters():
+            p.requires_grad = requires_grad
+
+    def forward(self, x: torch.Tensor):
+        return self.net(x)
+
+
+class MobileDecoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.block1 = nn.Sequential(
+            [
+                nn.Conv2d(
+                    160,
+                    128,
+                    3,
+                    1,
+                    1,
+                    groups=160,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+                nn.Conv2d(
+                    128,
+                    128,
+                    3,
+                    1,
+                    1,
+                    groups=128,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+                nn.Conv2d(
+                    128,
+                    128,
+                    3,
+                    1,
+                    1,
+                    groups=128,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+            ]
+        )
+
+        self.block2 = nn.Sequential(
+            [
+                nn.Upsample(scale_factor=2),
+                ResBlock(128),
+                ResBlock(128),
+                nn.Conv2d(
+                    128,
+                    128,
+                    3,
+                    1,
+                    1,
+                    groups=128,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+            ]
+        )
+
+        self.block3 = nn.Sequential(
+            [
+                nn.Upsample(scale_factor=2),
+                ResBlock(128),
+                ResBlock(128),
+                nn.Conv2d(
+                    128,
+                    64,
+                    3,
+                    1,
+                    1,
+                    groups=128,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+            ]
+        )
+
+        self.block4 = nn.Sequential(
+            [
+                nn.Upsample(scale_factor=2),
+                ResBlock(64),
+                ResBlock(64),
+                nn.Conv2d(
+                    64,
+                    64,
+                    3,
+                    1,
+                    1,
+                    groups=64,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+            ]
+        )
+
+        self.block4 = nn.Sequential(
+            [
+                nn.Upsample(scale_factor=2),
+                ResBlock(64),
+                ResBlock(64),
+                nn.Conv2d(
+                    64,
+                    32,
+                    3,
+                    1,
+                    1,
+                    groups=64,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+            ]
+        )
+
+        self.block5 = nn.Sequential(
+            [
+                nn.Upsample(scale_factor=2),
+                ResBlock(32),
+                ResBlock(32),
+                nn.Conv2d(
+                    32,
+                    16,
+                    3,
+                    1,
+                    1,
+                    groups=64,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+            ]
+        )
+
+        self.block6 = nn.Sequential(
+            [
+                ResBlock(16),
+                nn.Conv2d(
+                    16,
+                    3,
+                    3,
+                    1,
+                    1,
+                    groups=64,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+                nn.Conv2d(
+                    3,
+                    3,
+                    3,
+                    1,
+                    1,
+                    groups=64,
+                    padding_mode="reflect",
+                    bias=False,
+                ),
+            ]
+        )
+
+        self.net = nn.ModuleList(
+            [
+                self.block1,
+                self.block2,
+                self.block3,
+                self.block4,
+                self.block5,
+                self.block6,
+            ]
+        )
+
+    def forward(self, x, **kwargs):
+        for ix, block in enumerate(self.net):
+            x = block(x)
+            if ix < len(self.net) - 1:
+                x = F.relu(x)
+        return x
+
+
+class ResBlock(nn.Module):
+    def __init__(self, in_ch: int):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(
+            in_ch,
+            in_ch,
+            3,
+            1,
+            1,
+            groups=in_ch,
+            padding_mode="reflect",
+            bias=False,
+        )
+        self.conv2 = nn.Conv2d(
+            in_ch,
+            in_ch,
+            3,
+            1,
+            1,
+            groups=in_ch,
+            padding_mode="reflect",
+            bias=False,
+        )
+
+    def forward(self, x: torch.Tensor):
+        out = self.conv2(F.relu(self.conv1(x)))
+        return F.relu(out + x)
 
 
 class VggDecoder(nn.Module):
@@ -190,3 +408,11 @@ class StyleNet(nn.Module):
             return out, t
         else:
             return out
+
+
+class MobileStyleNet(StyleNet):
+    def __init__(self, dec_path: Optional[str]) -> None:
+        super().__init__(dec_path=None)
+
+        self.encoder = MobileNetBackend()
+        self.decoder = self.__create_or_load_model(MobileDecoder, dec_path)
